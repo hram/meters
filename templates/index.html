@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Показания счётчиков</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 24px 24px; max-width: 1400px; margin: 0 auto; }
+    .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 1.4rem; font-weight: 600; }
+    .top-actions { display: flex; align-items: center; gap: 12px; }
+    a.log-link { font-size: .85rem; color: #4a6cf7; text-decoration: none; }
+    .btn-all { background: #1a1a2e; color: #fff; border: none; border-radius: 8px; padding: 9px 20px; font-size: .88rem; cursor: pointer; font-weight: 500; transition: opacity .15s; }
+    .btn-all:hover { opacity: .85; }
+    .btn-all:disabled { opacity: .5; cursor: not-allowed; }
+    .services { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    @media (max-width: 1100px) { .services { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 680px)  { .services { grid-template-columns: 1fr; } }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+    .card-header { background: #1a1a2e; color: #fff; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .card-title { font-size: .9rem; font-weight: 600; }
+    .balance { font-size: .78rem; opacity: .7; white-space: nowrap; }
+    .error-banner { padding: 16px 20px; color: #e53e3e; font-size: .88rem; background: #fff5f5; }
+    .meter { padding: 14px 20px; border-bottom: 1px solid #f0f0f0; }
+    .meter:last-of-type { border-bottom: none; }
+    .meter-name { font-size: .92rem; font-weight: 500; margin-bottom: 10px; }
+    .scale-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; flex-wrap: wrap; }
+    .scale-label { font-size: .8rem; color: #666; min-width: 70px; }
+    .scale-prev { font-size: .8rem; color: #aaa; min-width: 100px; }
+    input[type="number"] { border: 1.5px solid #dde2ea; border-radius: 7px; padding: 6px 10px; font-size: .88rem; width: 130px; outline: none; transition: border-color .15s; }
+    input[type="number"]:focus { border-color: #4a6cf7; }
+    .unit { font-size: .78rem; color: #aaa; }
+    .card-footer { padding: 14px 20px; border-top: 1px solid #f0f0f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .btn-submit { background: #4a6cf7; color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: .88rem; cursor: pointer; font-weight: 500; transition: background .15s; }
+    .btn-submit:hover { background: #3a5ce6; }
+    .btn-submit:disabled { background: #a0aec0; cursor: not-allowed; }
+    .status { font-size: .82rem; display: none; }
+    .status.ok  { color: #38a169; display: inline; }
+    .status.err { color: #e53e3e; display: inline; }
+    .toggle-label { display: flex; align-items: center; gap: 7px; font-size: .78rem; cursor: pointer; opacity: .85; margin-left: auto; }
+    .toggle-label input { display: none; }
+    .toggle-track { width: 34px; height: 18px; background: #555; border-radius: 9px; position: relative; transition: background .2s; flex-shrink: 0; }
+    .toggle-track::after { content: ''; position: absolute; width: 12px; height: 12px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s; }
+    input:checked + .toggle-track { background: #4a6cf7; }
+    input:checked + .toggle-track::after { left: 19px; }
+    #all-status { font-size: .82rem; }
+    #all-status.ok  { color: #38a169; }
+    #all-status.err { color: #e53e3e; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <h1>Показания счётчиков</h1>
+    <div class="top-actions">
+      <span id="all-status"></span>
+      <button class="btn-all" onclick="submitAll(this)">Подать все показания</button>
+      <a class="log-link" href="/log">Журнал →</a>
+    </div>
+  </div>
+
+  <div class="services">
+    {% for svc in services %}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">{{ svc.label }}</span>
+        {% if svc.balance_text %}<span class="balance">{{ svc.balance_text }}</span>{% endif %}
+      </div>
+
+      {% if svc.error %}
+      <div class="error-banner">⚠ Сервис недоступен: {{ svc.error }}</div>
+      {% else %}
+
+      <form data-service="{{ svc.service }}" onsubmit="submitService(event, this)">
+        {% for meter in svc.meters %}
+        <div class="meter">
+          <div class="meter-name">{{ meter.name }}</div>
+          {% for scale in meter.scales %}
+          <div class="scale-row">
+            {% if meter.scales | length > 1 %}
+            <span class="scale-label">{{ scale.name }}</span>
+            {% endif %}
+            <span class="scale-prev">было: {{ scale.value if scale.value is not none else '—' }}</span>
+            <input type="number" step="any"
+              data-service="{{ svc.service }}"
+              data-meter-id="{{ meter.meter_id }}"
+              data-account-id="{{ meter.account_id }}"
+              data-scale-id="{{ scale.id }}"
+              {% for k, v in meter.extra.items() %}data-extra-{{ k }}="{{ v }}" {% endfor %}
+              value="{{ scale.value if scale.value is not none else '' }}"
+              required>
+            <span class="unit">{{ scale.unit or '' }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="padding:20px;color:#999;font-size:.88rem;">Счётчики не найдены</div>
+        {% endfor %}
+
+        <div class="card-footer">
+          <button class="btn-submit" type="submit">Подать показания</button>
+          <span class="status" id="status-{{ svc.service }}"></span>
+          <label class="toggle-label">
+            Авто
+            <input type="checkbox" {% if svc.auto_submit %}checked{% endif %}
+              onchange="toggleAuto('{{ svc.service }}', this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    async function toggleAuto(service, enabled) {
+      await fetch(`/api/services/${service}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_submit: enabled }),
+      });
+    }
+
+    async function submitAll(btn) {
+      const statusEl = document.getElementById('all-status');
+      btn.disabled = true;
+      statusEl.className = '';
+      statusEl.textContent = 'Отправка…';
+      try {
+        const res = await fetch('/api/submit-all', { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        statusEl.className = 'ok';
+        statusEl.textContent = '✓ Все показания приняты';
+      } catch (e) {
+        statusEl.className = 'err';
+        statusEl.textContent = '✗ ' + (e.message || 'Ошибка');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function apiService(service) {
+      // pesc_water / pesc_electricity both route to the pesc sub-portal
+      return service.startsWith('pesc') ? 'pesc' : service;
+    }
+
+    async function submitService(event, form) {
+      event.preventDefault();
+      const service = form.dataset.service;
+      const statusEl = document.getElementById('status-' + service);
+      const btn = form.querySelector('.btn-submit');
+
+      const body = buildPayload(service, form);
+      btn.disabled = true;
+      statusEl.className = 'status';
+      statusEl.textContent = 'Отправка…';
+      statusEl.style.display = 'inline';
+
+      try {
+        const res = await fetch(`/api/services/${apiService(service)}/submit-values`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        statusEl.className = 'status ok';
+        statusEl.textContent = '✓ Принято';
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = '✗ ' + (e.message || 'Ошибка');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function buildPayload(service, form) {
+      const inputs = form.querySelectorAll('input[type="number"]');
+      if (apiService(service) === 'pesc') {
+        // group by account_id + registration
+        const byMeter = {};
+        for (const inp of inputs) {
+          const key = `${inp.dataset.accountId}__${inp.dataset.meterId}`;
+          if (!byMeter[key]) byMeter[key] = {
+            account_id: Number(inp.dataset.accountId),
+            registration: inp.dataset.meterId,
+            scales: [],
+          };
+          byMeter[key].scales.push({ scale_id: Number(inp.dataset.scaleId), value: parseFloat(inp.value) });
+        }
+        return Object.values(byMeter);
+      } else {
+        // gaz: group by uuid
+        const byUuid = {};
+        for (const inp of inputs) {
+          const uuid = inp.dataset.meterId;
+          if (!byUuid[uuid]) byUuid[uuid] = {
+            uuid,
+            service_id: Number(inp.dataset.extraServiceId ?? 0),
+          };
+          const rate = inp.dataset.scaleId; // "day" | "night" | "middle"
+          if (inp.value !== '') byUuid[uuid][`value_${rate}`] = parseFloat(inp.value);
+        }
+        return Object.values(byUuid);
+      }
+    }
+  </script>
+</body>
+</html>
