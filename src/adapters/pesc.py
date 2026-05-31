@@ -35,12 +35,11 @@ class PescAdapter:
         self._base = base_url.rstrip("/")
 
     async def fetch(self) -> ServiceData:
-        """Fetch account info and meters; return ServiceData (never raises)."""
+        """Fetch account info and meters in one auth flow; return ServiceData (never raises)."""
         try:
             async with httpx.AsyncClient() as http:
-                acc = await _get(http, f"{self._base}/api/account")
-                meters_raw = await _get(http, f"{self._base}/api/meters")
-            return _build(acc, meters_raw)
+                data = await _get(http, f"{self._base}/api/dashboard")
+            return _build(data.get("account"), data.get("meters") or [])
         except Exception as exc:
             return ServiceData(
                 service="pesc",
@@ -60,6 +59,11 @@ class PescAdapter:
 
         water_meters = [m for m in full.meters if is_water_meter(m.name)]
         elec_meters  = [m for m in full.meters if not is_water_meter(m.name)]
+
+        for m in water_meters:
+            m.service = "pesc_water"
+        for m in elec_meters:
+            m.service = "pesc_electricity"
 
         water = ServiceData(service="pesc_water", label=LABEL_WATER,
                             account_id=full.account_id, balance_text=None, meters=water_meters)

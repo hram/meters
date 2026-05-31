@@ -7,21 +7,38 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 24px 24px; max-width: 1400px; margin: 0 auto; }
-    .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
     h1 { font-size: 1.4rem; font-weight: 600; }
-    .top-actions { display: flex; align-items: center; gap: 12px; }
-    a.log-link { font-size: .85rem; color: #4a6cf7; text-decoration: none; }
+    .top-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    a.nav-link { font-size: .85rem; color: #4a6cf7; text-decoration: none; }
+
+    /* View toggle */
+    .view-toggle { display: flex; background: #e8eaf0; border-radius: 8px; padding: 3px; gap: 2px; }
+    .view-toggle button { background: none; border: none; padding: 6px 14px; font-size: .82rem; border-radius: 6px; cursor: pointer; color: #666; font-weight: 500; transition: all .15s; }
+    .view-toggle button.active { background: #fff; color: #1a1a2e; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
     .btn-all { background: #1a1a2e; color: #fff; border: none; border-radius: 8px; padding: 9px 20px; font-size: .88rem; cursor: pointer; font-weight: 500; transition: opacity .15s; }
     .btn-all:hover { opacity: .85; }
     .btn-all:disabled { opacity: .5; cursor: not-allowed; }
-    .services { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-    @media (max-width: 1100px) { .services { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 680px)  { .services { grid-template-columns: 1fr; } }
+    #all-status { font-size: .82rem; }
+    #all-status.ok { color: #38a169; }
+    #all-status.err { color: #e53e3e; }
+
+    /* Grid */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 680px)  { .grid-3, .grid-auto { grid-template-columns: 1fr; } }
+
+    /* Cards */
     .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
     .card-header { background: #1a1a2e; color: #fff; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .card-title { font-size: .9rem; font-weight: 600; }
     .balance { font-size: .78rem; opacity: .7; white-space: nowrap; }
     .error-banner { padding: 16px 20px; color: #e53e3e; font-size: .88rem; background: #fff5f5; }
+    .empty-card { padding: 32px 20px; text-align: center; color: #bbb; font-size: .88rem; }
+
+    /* Meters */
     .meter { padding: 14px 20px; border-bottom: 1px solid #f0f0f0; }
     .meter:last-of-type { border-bottom: none; }
     .meter-name { font-size: .92rem; font-weight: 500; margin-bottom: 10px; }
@@ -31,6 +48,8 @@
     input[type="number"] { border: 1.5px solid #dde2ea; border-radius: 7px; padding: 6px 10px; font-size: .88rem; width: 130px; outline: none; transition: border-color .15s; }
     input[type="number"]:focus { border-color: #4a6cf7; }
     .unit { font-size: .78rem; color: #aaa; }
+
+    /* Card footer */
     .card-footer { padding: 14px 20px; border-top: 1px solid #f0f0f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .btn-submit { background: #4a6cf7; color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: .88rem; cursor: pointer; font-weight: 500; transition: background .15s; }
     .btn-submit:hover { background: #3a5ce6; }
@@ -44,59 +63,65 @@
     .toggle-track::after { content: ''; position: absolute; width: 12px; height: 12px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s; }
     input:checked + .toggle-track { background: #4a6cf7; }
     input:checked + .toggle-track::after { left: 19px; }
-    #all-status { font-size: .82rem; }
-    #all-status.ok  { color: #38a169; }
-    #all-status.err { color: #e53e3e; }
+
+    /* Service badge in "по объекту" */
+    .svc-badge { display: inline-block; font-size: .72rem; padding: 1px 7px; border-radius: 4px; margin-right: 6px; vertical-align: middle; font-weight: 500; }
+    .svc-pesc  { background: #ebf4ff; color: #2b6cb0; }
+    .svc-gaz   { background: #fef3c7; color: #92400e; }
   </style>
 </head>
 <body>
   <div class="top">
     <h1>Показания счётчиков</h1>
-    <div class="top-actions">
+    <div class="top-right">
+      <div class="view-toggle">
+        <button id="btn-type"     onclick="setView('type')">По типу</button>
+        <button id="btn-property" onclick="setView('property')">По объекту</button>
+      </div>
       <span id="all-status"></span>
-      <button class="btn-all" onclick="submitAll(this)">Подать все показания</button>
-      <a class="log-link" href="/log">Журнал →</a>
+      <button class="btn-all" onclick="submitAll(this)">Подать все</button>
+      <a class="nav-link" href="/properties">Объекты</a>
+      <a class="nav-link" href="/log">Журнал →</a>
     </div>
   </div>
 
-  <div class="services">
+  {# ── Jinja2 macro: render one meter ──────────────────────────────────────── #}
+  {% macro render_meter(meter) %}
+  <div class="meter">
+    <div class="meter-name">{{ meter.name }}</div>
+    {% for scale in meter.scales %}
+    <div class="scale-row">
+      {% if meter.scales | length > 1 %}<span class="scale-label">{{ scale.name }}</span>{% endif %}
+      <span class="scale-prev">было: {{ scale.value if scale.value is not none else '—' }}</span>
+      <input type="number" step="any"
+        data-service="{{ meter.service }}"
+        data-meter-id="{{ meter.meter_id }}"
+        data-account-id="{{ meter.account_id }}"
+        data-scale-id="{{ scale.id }}"
+        {% for k, v in meter.extra.items() %}data-extra-{{ k }}="{{ v }}" {% endfor %}
+        value="{{ scale.value if scale.value is not none else '' }}"
+        required>
+      <span class="unit">{{ scale.unit or '' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endmacro %}
+
+  {# ── ВИД: По типу ─────────────────────────────────────────────────────────── #}
+  <div id="view-type" class="grid-3">
     {% for svc in services %}
     <div class="card">
       <div class="card-header">
         <span class="card-title">{{ svc.label }}</span>
         {% if svc.balance_text %}<span class="balance">{{ svc.balance_text }}</span>{% endif %}
       </div>
-
       {% if svc.error %}
       <div class="error-banner">⚠ Сервис недоступен: {{ svc.error }}</div>
       {% else %}
-
       <form data-service="{{ svc.service }}" onsubmit="submitService(event, this)">
-        {% for meter in svc.meters %}
-        <div class="meter">
-          <div class="meter-name">{{ meter.name }}</div>
-          {% for scale in meter.scales %}
-          <div class="scale-row">
-            {% if meter.scales | length > 1 %}
-            <span class="scale-label">{{ scale.name }}</span>
-            {% endif %}
-            <span class="scale-prev">было: {{ scale.value if scale.value is not none else '—' }}</span>
-            <input type="number" step="any"
-              data-service="{{ svc.service }}"
-              data-meter-id="{{ meter.meter_id }}"
-              data-account-id="{{ meter.account_id }}"
-              data-scale-id="{{ scale.id }}"
-              {% for k, v in meter.extra.items() %}data-extra-{{ k }}="{{ v }}" {% endfor %}
-              value="{{ scale.value if scale.value is not none else '' }}"
-              required>
-            <span class="unit">{{ scale.unit or '' }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div style="padding:20px;color:#999;font-size:.88rem;">Счётчики не найдены</div>
+        {% for meter in svc.meters %}{{ render_meter(meter) }}{% else %}
+        <div class="empty-card">Счётчики не найдены</div>
         {% endfor %}
-
         <div class="card-footer">
           <button class="btn-submit" type="submit">Подать показания</button>
           <span class="status" id="status-{{ svc.service }}"></span>
@@ -113,15 +138,157 @@
     {% endfor %}
   </div>
 
+  {# ── ВИД: По объекту ──────────────────────────────────────────────────────── #}
+  <div id="view-property" class="grid-auto" style="display:none">
+    {% for prop in props_view %}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">{{ prop.name }}</span>
+      </div>
+      {% if prop.meters %}
+      <form data-prop="{{ prop.id }}" onsubmit="submitProperty(event, this)">
+        {% for meter in prop.meters %}
+        <div class="meter">
+          <div class="meter-name">
+            <span class="svc-badge svc-{{ 'gaz' if meter.service == 'gaz' else 'pesc' }}">
+              {{ 'Газ' if meter.service == 'gaz' else ('Вода' if 'water' in meter.service else 'Свет') }}
+            </span>
+            {{ meter.name }}
+          </div>
+          {% for scale in meter.scales %}
+          <div class="scale-row">
+            {% if meter.scales | length > 1 %}<span class="scale-label">{{ scale.name }}</span>{% endif %}
+            <span class="scale-prev">было: {{ scale.value if scale.value is not none else '—' }}</span>
+            <input type="number" step="any"
+              data-service="{{ meter.service }}"
+              data-meter-id="{{ meter.meter_id }}"
+              data-account-id="{{ meter.account_id }}"
+              data-scale-id="{{ scale.id }}"
+              {% for k, v in meter.extra.items() %}data-extra-{{ k }}="{{ v }}" {% endfor %}
+              value="{{ scale.value if scale.value is not none else '' }}"
+              required>
+            <span class="unit">{{ scale.unit or '' }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+        <div class="card-footer">
+          <button class="btn-submit" type="submit">Подать показания</button>
+          <span class="status" id="prop-status-{{ prop.id }}"></span>
+        </div>
+      </form>
+      {% else %}
+      <div class="empty-card">Счётчики не назначены</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
   <script>
-    async function toggleAuto(service, enabled) {
-      await fetch(`/api/services/${service}/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auto_submit: enabled }),
-      });
+    // ── View toggle ────────────────────────────────────────────────────────────
+    function setView(v) {
+      document.getElementById('view-type').style.display     = v === 'type'     ? '' : 'none';
+      document.getElementById('view-property').style.display = v === 'property' ? '' : 'none';
+      document.getElementById('btn-type').classList.toggle('active',     v === 'type');
+      document.getElementById('btn-property').classList.toggle('active', v === 'property');
+      localStorage.setItem('meters-view', v);
+    }
+    setView(localStorage.getItem('meters-view') || 'type');
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function apiService(service) {
+      return service.startsWith('pesc') ? 'pesc' : service;
     }
 
+    function buildPayload(apiSvc, inputs) {
+      if (apiSvc === 'pesc') {
+        const byMeter = {};
+        for (const inp of inputs) {
+          const key = `${inp.dataset.accountId}__${inp.dataset.meterId}`;
+          if (!byMeter[key]) byMeter[key] = { account_id: Number(inp.dataset.accountId), registration: inp.dataset.meterId, scales: [] };
+          byMeter[key].scales.push({ scale_id: Number(inp.dataset.scaleId), value: parseFloat(inp.value) });
+        }
+        return Object.values(byMeter);
+      } else {
+        const byUuid = {};
+        for (const inp of inputs) {
+          const uuid = inp.dataset.meterId;
+          if (!byUuid[uuid]) byUuid[uuid] = { uuid, service_id: Number(inp.dataset.extraServiceId ?? 0) };
+          if (inp.value !== '') byUuid[uuid][`value_${inp.dataset.scaleId}`] = parseFloat(inp.value);
+        }
+        return Object.values(byUuid);
+      }
+    }
+
+    async function callSubmit(apiSvc, body, statusEl, btn) {
+      btn.disabled = true;
+      statusEl.className = 'status';
+      statusEl.textContent = 'Отправка…';
+      statusEl.style.display = 'inline';
+      try {
+        const res = await fetch(`/api/services/${apiSvc}/submit-values`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        statusEl.className = 'status ok';
+        statusEl.textContent = '✓ Принято';
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = '✗ ' + (e.message || 'Ошибка');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── Submit: по типу ────────────────────────────────────────────────────────
+    async function submitService(event, form) {
+      event.preventDefault();
+      const service = form.dataset.service;
+      await callSubmit(
+        apiService(service),
+        buildPayload(apiService(service), form.querySelectorAll('input[type="number"]')),
+        document.getElementById('status-' + service),
+        form.querySelector('.btn-submit'),
+      );
+    }
+
+    // ── Submit: по объекту ─────────────────────────────────────────────────────
+    async function submitProperty(event, form) {
+      event.preventDefault();
+      const propId = form.dataset.prop;
+      const statusEl = document.getElementById('prop-status-' + propId);
+      const btn = form.querySelector('.btn-submit');
+
+      // Group inputs by canonical service
+      const bySvc = {};
+      for (const inp of form.querySelectorAll('input[type="number"]')) {
+        const svc = apiService(inp.dataset.service);
+        if (!bySvc[svc]) bySvc[svc] = [];
+        bySvc[svc].push(inp);
+      }
+
+      btn.disabled = true;
+      statusEl.className = 'status';
+      statusEl.textContent = 'Отправка…';
+      statusEl.style.display = 'inline';
+      try {
+        await Promise.all(Object.entries(bySvc).map(([svc, inputs]) =>
+          fetch(`/api/services/${svc}/submit-values`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildPayload(svc, inputs)),
+          }).then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t); }); })
+        ));
+        statusEl.className = 'status ok';
+        statusEl.textContent = '✓ Принято';
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = '✗ ' + (e.message || 'Ошибка');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── Submit all ─────────────────────────────────────────────────────────────
     async function submitAll(btn) {
       const statusEl = document.getElementById('all-status');
       btn.disabled = true;
@@ -140,69 +307,12 @@
       }
     }
 
-    function apiService(service) {
-      // pesc_water / pesc_electricity both route to the pesc sub-portal
-      return service.startsWith('pesc') ? 'pesc' : service;
-    }
-
-    async function submitService(event, form) {
-      event.preventDefault();
-      const service = form.dataset.service;
-      const statusEl = document.getElementById('status-' + service);
-      const btn = form.querySelector('.btn-submit');
-
-      const body = buildPayload(service, form);
-      btn.disabled = true;
-      statusEl.className = 'status';
-      statusEl.textContent = 'Отправка…';
-      statusEl.style.display = 'inline';
-
-      try {
-        const res = await fetch(`/api/services/${apiService(service)}/submit-values`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        statusEl.className = 'status ok';
-        statusEl.textContent = '✓ Принято';
-      } catch (e) {
-        statusEl.className = 'status err';
-        statusEl.textContent = '✗ ' + (e.message || 'Ошибка');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    function buildPayload(service, form) {
-      const inputs = form.querySelectorAll('input[type="number"]');
-      if (apiService(service) === 'pesc') {
-        // group by account_id + registration
-        const byMeter = {};
-        for (const inp of inputs) {
-          const key = `${inp.dataset.accountId}__${inp.dataset.meterId}`;
-          if (!byMeter[key]) byMeter[key] = {
-            account_id: Number(inp.dataset.accountId),
-            registration: inp.dataset.meterId,
-            scales: [],
-          };
-          byMeter[key].scales.push({ scale_id: Number(inp.dataset.scaleId), value: parseFloat(inp.value) });
-        }
-        return Object.values(byMeter);
-      } else {
-        // gaz: group by uuid
-        const byUuid = {};
-        for (const inp of inputs) {
-          const uuid = inp.dataset.meterId;
-          if (!byUuid[uuid]) byUuid[uuid] = {
-            uuid,
-            service_id: Number(inp.dataset.extraServiceId ?? 0),
-          };
-          const rate = inp.dataset.scaleId; // "day" | "night" | "middle"
-          if (inp.value !== '') byUuid[uuid][`value_${rate}`] = parseFloat(inp.value);
-        }
-        return Object.values(byUuid);
-      }
+    // ── Auto-submit toggle ─────────────────────────────────────────────────────
+    async function toggleAuto(service, enabled) {
+      await fetch(`/api/services/${apiService(service)}/settings`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_submit: enabled }),
+      });
     }
   </script>
 </body>

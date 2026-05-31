@@ -8,6 +8,7 @@ from portal.db import init_db
 from portal.routers.dashboard import router as dashboard_router
 from portal.routers.submit import router as submit_router
 from portal.routers.settings import router as settings_router
+from portal.routers.properties import router as properties_router
 from portal.scheduler import create_scheduler
 
 
@@ -31,4 +32,5 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(submit_router)
 app.include_router(settings_router)
+app.include_router(properties_router)
 app.include_router(dashboard_router)

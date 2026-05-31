@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Объекты недвижимости</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f9; color: #1a1a2e; padding: 24px 24px; max-width: 860px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    h1 { font-size: 1.4rem; font-weight: 600; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; }
+    a { color: #4a6cf7; text-decoration: none; font-size: .85rem; }
+    .section { margin-bottom: 28px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+    .card-body { padding: 16px 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    td, th { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-align: left; }
+    th { font-size: .8rem; font-weight: 500; color: #666; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbff; }
+    .empty { padding: 24px; text-align: center; color: #bbb; font-size: .88rem; }
+
+    /* Forms */
+    .add-form { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #f0f0f0; }
+    input[type="text"] { border: 1.5px solid #dde2ea; border-radius: 7px; padding: 7px 10px; font-size: .88rem; flex: 1; outline: none; }
+    input[type="text"]:focus { border-color: #4a6cf7; }
+    .btn { border: none; border-radius: 7px; padding: 7px 16px; font-size: .85rem; cursor: pointer; font-weight: 500; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: #4a6cf7; color: #fff; }
+    .btn-danger  { background: #fff; color: #e53e3e; border: 1.5px solid #fed7d7; }
+    .btn-sm { padding: 4px 11px; font-size: .78rem; }
+
+    /* Inline edit */
+    .name-cell { display: flex; align-items: center; gap: 8px; }
+    .name-view { flex: 1; }
+    .name-edit { display: none; flex: 1; }
+    .name-edit input { width: 100%; }
+
+    /* Assignment select */
+    select { border: 1.5px solid #dde2ea; border-radius: 7px; padding: 5px 8px; font-size: .82rem; outline: none; cursor: pointer; background: #fff; max-width: 180px; }
+    select:focus { border-color: #4a6cf7; }
+    .svc-badge { display: inline-block; font-size: .72rem; padding: 1px 7px; border-radius: 4px; margin-right: 4px; font-weight: 500; }
+    .svc-pesc { background: #ebf4ff; color: #2b6cb0; }
+    .svc-gaz  { background: #fef3c7; color: #92400e; }
+    .saved-flash { font-size: .75rem; color: #38a169; margin-left: 6px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Объекты недвижимости</h1>
+    <a href="/">← На дашборд</a>
+  </div>
+
+  <!-- Properties -->
+  <div class="section">
+    <h2>Объекты</h2>
+    <div class="card">
+      {% if properties %}
+      <table>
+        <thead><tr><th>Название</th><th></th></tr></thead>
+        <tbody id="props-tbody">
+          {% for p in properties %}
+          <tr id="prop-row-{{ p.id }}">
+            <td>
+              <div class="name-cell">
+                <span class="name-view" id="name-view-{{ p.id }}">{{ p.name }}</span>
+                <span class="name-edit" id="name-edit-{{ p.id }}">
+                  <input type="text" value="{{ p.name }}" onkeydown="if(event.key==='Enter')saveProp({{ p.id }})">
+                </span>
+              </div>
+            </td>
+            <td style="white-space:nowrap;text-align:right">
+              <button class="btn btn-sm" id="edit-btn-{{ p.id }}" onclick="startEdit({{ p.id }})">Изменить</button>
+              <button class="btn btn-sm" id="save-btn-{{ p.id }}" style="display:none;background:#4a6cf7;color:#fff" onclick="saveProp({{ p.id }})">Сохранить</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteProp({{ p.id }})">Удалить</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <table><tbody id="props-tbody"></tbody></table>
+      <div class="empty" id="props-empty">Объекты не добавлены</div>
+      {% endif %}
+      <div class="add-form">
+        <input type="text" id="new-prop-name" placeholder="Название объекта (например: Квартира)" onkeydown="if(event.key==='Enter')addProp()">
+        <button class="btn btn-primary" onclick="addProp()">Добавить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meter assignments -->
+  <div class="section">
+    <h2>Назначение счётчиков</h2>
+    <div class="card" id="meters-card">
+      <div class="empty" id="meters-loading">Загрузка счётчиков…</div>
+    </div>
+  </div>
+
+  <script>
+    const _assignments = {{ assignments | tojson }};
+    const _properties  = {{ properties | tojson }};
+  </script>
+
+  <script>
+    // ── Properties CRUD ────────────────────────────────────────────────────────
+    async function addProp() {
+      const inp = document.getElementById('new-prop-name');
+      const name = inp.value.trim();
+      if (!name) return;
+      const res = await fetch('/api/properties', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) return;
+      const prop = await res.json();
+      inp.value = '';
+
+      // Add row to properties table
+      const tbody = document.querySelector('#props-tbody');
+      const noRow = document.getElementById('props-empty');
+      if (noRow) noRow.remove();
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr id="prop-row-${prop.id}">
+          <td>
+            <div class="name-cell">
+              <span class="name-view" id="name-view-${prop.id}">${prop.name}</span>
+              <span class="name-edit" id="name-edit-${prop.id}" style="display:none">
+                <input type="text" value="${prop.name}" onkeydown="if(event.key==='Enter')saveProp(${prop.id})">
+              </span>
+            </div>
+          </td>
+          <td style="white-space:nowrap;text-align:right">
+            <button class="btn btn-sm" id="edit-btn-${prop.id}" onclick="startEdit(${prop.id})">Изменить</button>
+            <button class="btn btn-sm" id="save-btn-${prop.id}" style="display:none;background:#4a6cf7;color:#fff" onclick="saveProp(${prop.id})">Сохранить</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteProp(${prop.id})">Удалить</button>
+          </td>
+        </tr>`);
+
+      // Keep _properties in sync and update all selects
+      _properties.push({ id: prop.id, name: prop.name });
+      document.querySelectorAll('.assign-select').forEach(sel => {
+        sel.insertAdjacentHTML('beforeend', `<option value="${prop.id}">${prop.name}</option>`);
+      });
+    }
+
+    function startEdit(id) {
+      document.getElementById('name-view-' + id).style.display = 'none';
+      document.getElementById('name-edit-' + id).style.display = 'inline-flex';
+      document.getElementById('edit-btn-' + id).style.display = 'none';
+      document.getElementById('save-btn-' + id).style.display = '';
+      document.querySelector(`#name-edit-${id} input`).focus();
+    }
+
+    async function saveProp(id) {
+      const name = document.querySelector(`#name-edit-${id} input`).value.trim();
+      if (!name) return;
+      const res = await fetch(`/api/properties/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) return;
+
+      // Update name in table row
+      document.getElementById('name-view-' + id).textContent = name;
+      document.getElementById('name-view-' + id).style.display = '';
+      document.getElementById('name-edit-' + id).style.display = 'none';
+      document.getElementById('edit-btn-' + id).style.display = '';
+      document.getElementById('save-btn-' + id).style.display = 'none';
+
+      // Keep _properties in sync and update all selects
+      const p = _properties.find(p => p.id === id);
+      if (p) p.name = name;
+      document.querySelectorAll(`.assign-select option[value="${id}"]`).forEach(opt => {
+        opt.textContent = name;
+      });
+    }
+
+    async function deleteProp(id) {
+      if (!confirm('Удалить объект? Назначения счётчиков будут сброшены.')) return;
+      await fetch(`/api/properties/${id}`, { method: 'DELETE' });
+
+      // Remove row from table
+      document.getElementById('prop-row-' + id)?.remove();
+
+      // Keep _properties in sync and update all selects
+      const idx = _properties.findIndex(p => p.id === id);
+      if (idx !== -1) _properties.splice(idx, 1);
+      document.querySelectorAll(`.assign-select option[value="${id}"]`).forEach(opt => {
+        if (opt.selected) opt.closest('select').value = '';
+        opt.remove();
+      });
+    }
+
+    // ── Meter assignments ──────────────────────────────────────────────────────
+    async function assignMeter(service, meterId, select) {
+      const propertyId = select.value ? Number(select.value) : null;
+      await fetch(`/api/assignments/${service}/${meterId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: propertyId }),
+      });
+      const flash = document.getElementById(`flash-${service}-${meterId}`);
+      if (flash) { flash.style.display = 'inline'; setTimeout(() => { flash.style.display = 'none'; }, 1500); }
+    }
+
+    function buildPropertyOptions(selectedId) {
+      let html = '<option value="">— Без объекта —</option>';
+      for (const p of _properties) {
+        html += `<option value="${p.id}" ${selectedId === p.id ? 'selected' : ''}>${p.name}</option>`;
+      }
+      return html;
+    }
+
+    async function loadMeters() {
+      const card = document.getElementById('meters-card');
+      try {
+        const res = await fetch('/api/meters');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const meters = await res.json();
+        if (!meters.length) {
+          card.innerHTML = '<div class="empty">Счётчики не найдены — убедитесь что порталы запущены</div>';
+          return;
+        }
+        let rows = meters.map(m => {
+          const key = `${m.service}:${m.meter_id}`;
+          const propId = _assignments[key] ?? null;
+          const badge = m.service === 'gaz'
+            ? '<span class="svc-badge svc-gaz">Газ</span>'
+            : '<span class="svc-badge svc-pesc">Вода/Свет</span>';
+          const flashId = `flash-${m.service}-${m.meter_id}`;
+          const selId   = `sel-${m.service}-${m.meter_id}`;
+          return `<tr>
+            <td>${badge} ${m.name}</td>
+            <td>
+              <select class="assign-select" id="${selId}"
+                onchange="assignMeter('${m.service}', '${m.meter_id}', this)">
+                ${buildPropertyOptions(propId)}
+              </select>
+              <span class="saved-flash" id="${flashId}">✓</span>
+            </td>
+          </tr>`;
+        }).join('');
+        card.innerHTML = `<table>
+          <thead><tr><th>Счётчик</th><th>Объект</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      } catch (e) {
+        card.innerHTML = `<div class="empty">Ошибка загрузки: ${e.message}</div>`;
+      }
+    }
+
+    loadMeters();
+  </script>
+</body>
+</html>

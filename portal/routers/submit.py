@@ -9,6 +9,22 @@ from src.adapters import PescAdapter, GazAdapter
 router = APIRouter(prefix="/api", tags=["submit"])
 
 
+@router.get("/meters")
+async def get_all_meters() -> list[dict]:
+    """All meters from all sub-portals, normalized for the properties assignment UI."""
+    (water, electricity), gaz_data = await asyncio.gather(
+        PescAdapter(settings.pesc_api_url).fetch_split(),
+        GazAdapter(settings.gaz_api_url).fetch(),
+    )
+    result = []
+    for svc_data in [water, electricity, gaz_data]:
+        if not svc_data.error:
+            for m in svc_data.meters:
+                canonical = "pesc" if m.service.startswith("pesc") else m.service
+                result.append({"service": canonical, "meter_id": m.meter_id, "name": m.name})
+    return result
+
+
 @router.post("/services/pesc/submit", status_code=204)
 async def pesc_submit() -> None:
     """Submit same values for all pesc accounts."""
