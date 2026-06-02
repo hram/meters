@@ -65,7 +65,7 @@ async def index(request: Request) -> HTMLResponse:
     if unassigned:
         props_view.append({"id": None, "name": "Без объекта", "meters": unassigned})
 
-    return templates.TemplateResponse("index.html", {
+    return templates.TemplateResponse(request, "index.html", {
         "request": request,
         "services": services,
         "props_view": props_view,
@@ -75,14 +75,14 @@ async def index(request: Request) -> HTMLResponse:
 @router.get("/log", response_class=HTMLResponse)
 async def log_page(request: Request) -> HTMLResponse:
     entries = get_log()
-    return templates.TemplateResponse("log.html", {"request": request, "entries": entries})
+    return templates.TemplateResponse(request, "log.html", {"request": request, "entries": entries})
 
 
 @router.get("/properties", response_class=HTMLResponse)
 async def properties_page(request: Request) -> HTMLResponse:
     properties = get_properties()
     assignments = get_assignments()
-    return templates.TemplateResponse("properties.html", {
+    return templates.TemplateResponse(request, "properties.html", {
         "request": request,
         "properties": properties,
         "assignments": {f"{s}:{m}": p for (s, m), p in assignments.items()},
