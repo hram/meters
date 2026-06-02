@@ -34,3 +34,8 @@ app.include_router(submit_router)
 app.include_router(settings_router)
 app.include_router(properties_router)
 app.include_router(dashboard_router)
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}

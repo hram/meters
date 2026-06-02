@@ -1,0 +1,73 @@
+services:
+  pesc:
+    build:
+      context: https://github.com/hram/pesc.git#main
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      PESC_LOGIN: ${PESC_LOGIN}
+      PESC_PASSWORD: ${PESC_PASSWORD}
+      PESC_AUTH_VERIFICATION: ${PESC_AUTH_VERIFICATION:-}
+      PESC_TOTP_SECRET: ${PESC_TOTP_SECRET:-}
+      PESC_PROXY_URL: ${PESC_PROXY_URL:-}
+      DATA_DIR: /data/pesc
+      SCHEDULER_HOUR: ${PESC_SCHEDULER_HOUR:-12}
+      SCHEDULER_MINUTE: ${PESC_SCHEDULER_MINUTE:-0}
+    volumes:
+      - /srv/meters/pesc:/data/pesc
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  gaz:
+    build:
+      context: https://github.com/hram/peterburgregiongaz.git#main
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      GAZ_LOGIN: ${GAZ_LOGIN}
+      GAZ_PASSWORD: ${GAZ_PASSWORD}
+      GAZ_LSPU_ID: ${GAZ_LSPU_ID}
+      GAZ_PROXY_URL: ${GAZ_PROXY_URL:-}
+      DATA_DIR: /data/gaz
+      SCHEDULER_HOUR: ${GAZ_SCHEDULER_HOUR:-12}
+      SCHEDULER_MINUTE: ${GAZ_SCHEDULER_MINUTE:-0}
+    volumes:
+      - /srv/meters/gaz:/data/gaz
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  meters:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      pesc:
+        condition: service_healthy
+      gaz:
+        condition: service_healthy
+    ports:
+      - "8005:8000"
+    environment:
+      PESC_API_URL: http://pesc:8000
+      GAZ_API_URL: http://gaz:8000
+      DATA_DIR: /data/meters
+      SCHEDULER_HOUR: ${METERS_SCHEDULER_HOUR:-12}
+      SCHEDULER_MINUTE: ${METERS_SCHEDULER_MINUTE:-0}
+    volumes:
+      - /srv/meters/meters:/data/meters
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
